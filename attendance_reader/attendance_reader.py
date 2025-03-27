@@ -2,7 +2,7 @@ import csv
 from datetime import datetime
 import pydantic
 from enum import Enum, auto
-
+from typing import Optional
 
 class InMeetingActivity(pydantic.BaseModel):
     name: str
@@ -11,7 +11,6 @@ class InMeetingActivity(pydantic.BaseModel):
     leave_time: datetime
     duration: str
     role: str
-
 
 class Participant(pydantic.BaseModel):
     email: str
@@ -26,18 +25,15 @@ class CSVConfig(pydantic.BaseModel):
     ENCODING: str
     DELIMITER: str
 
-
 class SectionHeading(Enum):
     START_TIME = auto()
     PARTICIPANTS = auto()
     MEETING_ACTIVITIES = auto()
     VIDEO_AND_AUDIO_CONSENT = auto()
 
-
 class AttendanceConfig(pydantic.BaseModel):
     date_time_format: str
     section_headings_mapping: dict[str, SectionHeading]
-
 
 class AttendanceReader:
 
@@ -51,16 +47,27 @@ class AttendanceReader:
         self._ATTENDANCE_CONFIG: AttendanceConfig = attendance_config
 
         # define variables to operate class
-        self._csv_reader: csv.reader = None
+        self._csv_content: list[str] = []
         self._section_indexes: dict[SectionHeading, int] = {}
 
         # extract data
-        self._init_csv_reader()
+        self._get_csv_content()
         self._extract_section_indexes()
+    
+    def _get_csv_content(self) -> None:
+        with open(
+            self._CSV_CONFIG.FILE_PATH,
+            mode="r",
+            newline="",
+            encoding=self._CSV_CONFIG.ENCODING,
+        ) as file:
+            self._csv_content = list(
+                csv.reader(file, delimiter=self._CSV_CONFIG.DELIMITER)
+            )
 
     def _extract_section_indexes(self) -> None:
 
-        for index, record in enumerate(self._csv_reader):
+        for index, record in enumerate(self._csv_content):
 
             # check if current line is a section heading
             section_name = record[0]
@@ -71,6 +78,9 @@ class AttendanceReader:
                     section_name
                 ]
                 self._section_indexes[section_id] = index + 2
+        
+        if len(self._section_indexes) == 0:
+            raise Exception("Logic Error: Unable to find any section headings in csv file.")
 
     @property
     def start_time(self) -> datetime:
@@ -100,7 +110,7 @@ class AttendanceReader:
         end_index = self._section_indexes[SectionHeading.MEETING_ACTIVITIES] - 3
 
         for index in range(start_index, end_index):
-            record = self._csv_reader[index]
+            record = self._csv_content[index]
 
             join_time = self._convert_string_to_datetime(record[1])
             leave_time = self._convert_string_to_datetime(record[2])
@@ -129,7 +139,7 @@ class AttendanceReader:
         end_index = self._section_indexes[SectionHeading.VIDEO_AND_AUDIO_CONSENT] - 3
 
         for index in range(start_index, end_index):
-            record = self._csv_reader[index]
+            record = self._csv_content[index]
 
             name = record[0]
             join_time = self._convert_string_to_datetime(record[1])
@@ -155,15 +165,6 @@ class AttendanceReader:
         return datetime.strptime(
             date_time_str, self._ATTENDANCE_CONFIG.date_time_format
         )
-
-    def _init_csv_reader(self) -> None:
-        with open(
-            self._CSV_CONFIG.FILE_PATH,
-            mode="r",
-            newline="",
-            encoding=self._CSV_CONFIG.ENCODING,
-        ) as file:
-            self._csv_reader = csv.reader(file, delimiter=self._CSV_CONFIG.DELIMITER)
 
 
 if __name__ == "__main__":

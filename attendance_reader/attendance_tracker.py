@@ -1,6 +1,5 @@
 from attendance_reader import (
     Participant,
-    SessionData,
     CSVConfig,
     SectionHeading,
     AttendanceConfig,
@@ -47,7 +46,7 @@ class AttendanceTracker:
         self,
         session_start_time: datetime,
         session_end_time: datetime,
-        minimum_attendance_percentage: float,
+        minimum_attendance_percentage: float
     ) -> list[str]:
         qualified_participants: list[str] = []
 
@@ -65,10 +64,10 @@ class AttendanceTracker:
             start_time = (
                 0
                 if activity.join_time >= session_end_time
-                else max(session_start_time, activity.leave_time)
+                else max(session_start_time, activity.join_time)
             )
 
-            end_time = min(session_end_time, activity.join_time)
+            end_time = min(session_end_time, activity.leave_time)
 
             participant_time_mapping[activity.email] += (
                 0
